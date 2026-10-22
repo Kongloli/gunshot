@@ -134,5 +134,11 @@
   "Upload all accessible photos and videos": "Upload all accessible photos and videos",
   "Add %lu items to the queue? Originals are prepared one at a time. Keep the app open.": "Add %lu items to the queue? Originals are prepared one at a time. Keep the app open.",
   "No accessible photos in this album. Check photo permissions.": "No accessible photos in this album. Check photo permissions.",
-  "Developer": "Developer"
+  "Developer": "Developer",
+  "Only back up photos taken after": "Only back up photos taken after",
+  "All photos": "All photos",
+  "From now on": "From now on",
+  "Choose date…": "Choose date…",
+  "Save": "Save",
+  "Older photos are not uploaded through GoToHP. Google Photos still marks the ones already in the cloud as backed up.": "Older photos are not uploaded through GoToHP. Google Photos still marks the ones already in the cloud as backed up."
 }

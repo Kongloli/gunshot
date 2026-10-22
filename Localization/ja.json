@@ -134,5 +134,11 @@
   "Upload all accessible photos and videos": "アクセス可能な写真・動画をまとめてアップロード",
   "Add %lu items to the queue? Originals are prepared one at a time. Keep the app open.": "%lu件をキューに追加しますか？原本を1件ずつ準備します。アプリを開いたままにしてください。",
   "No accessible photos in this album. Check photo permissions.": "このアルバムにアクセス可能な写真がありません。写真のアクセス権を確認してください。",
-  "Developer": "開発者"
+  "Developer": "開発者",
+  "Only back up photos taken after": "この日時以降に撮影した写真のみバックアップ",
+  "All photos": "すべての写真",
+  "From now on": "今から",
+  "Choose date…": "日時を選択…",
+  "Save": "保存",
+  "Older photos are not uploaded through GoToHP. Google Photos still marks the ones already in the cloud as backed up.": "それより前の写真は GoToHP でアップロードされません。クラウドに既にある写真は Google フォトがバックアップ済みとして表示します。"
 }

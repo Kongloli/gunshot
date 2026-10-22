@@ -8,3 +8,8 @@ FOUNDATION_EXPORT BOOL GSNativeRoutingEnabled(void);
 FOUNDATION_EXPORT NSString *GSNativeRoutingAccount(void);
 FOUNDATION_EXPORT void GSSetNativeRouting(BOOL enabled, NSString *account);
 FOUNDATION_EXPORT NSDictionary *GSNativeRoutingSnapshot(void);
+// Optional cutoff: assets created before this date are not uploaded through GoToHP.
+// nil means every asset is routed (the default).
+FOUNDATION_EXPORT NSDate *GSNativeRoutingCutoff(void);
+FOUNDATION_EXPORT void GSSetNativeRoutingCutoff(NSDate *cutoff);
+FOUNDATION_EXPORT BOOL GSNativeRoutingSkipsAsset(PHAsset *asset);

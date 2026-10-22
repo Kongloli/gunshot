@@ -134,5 +134,11 @@
   "Upload all accessible photos and videos": "上传所有可读取的媒体",
   "Add %lu items to the queue? Originals are prepared one at a time. Keep the app open.": "是否要添加 %lu 项内容到队列？原图的准备工作将逐一进行，请保持 App 开启",
   "No accessible photos in this album. Check photo permissions.": "此相册中无可访问的图片，请检查访问权限",
-  "Developer": "开发者"
+  "Developer": "开发者",
+  "Only back up photos taken after": "仅备份此时间之后拍摄的照片",
+  "All photos": "全部照片",
+  "From now on": "从现在开始",
+  "Choose date…": "选择日期…",
+  "Save": "保存",
+  "Older photos are not uploaded through GoToHP. Google Photos still marks the ones already in the cloud as backed up.": "早于该时间的照片不会通过 GoToHP 上传。云端已有的照片仍会由 Google 相册标记为已备份。"
 }

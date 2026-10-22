@@ -134,5 +134,11 @@
   "Upload all accessible photos and videos": "Tải lên tất cả ảnh và video có thể truy cập",
   "Add %lu items to the queue? Originals are prepared one at a time. Keep the app open.": "Thêm %lu mục vào hàng đợi? Các bản gốc được chuẩn bị lần lượt. Hãy giữ ứng dụng mở.",
   "No accessible photos in this album. Check photo permissions.": "Không có ảnh nào có thể truy cập trong album này. Kiểm tra quyền đối với ảnh.",
-  "Developer": "Nhà phát triển"
+  "Developer": "Nhà phát triển",
+  "Only back up photos taken after": "Chỉ sao lưu ảnh chụp sau thời điểm",
+  "All photos": "Tất cả ảnh",
+  "From now on": "Từ bây giờ",
+  "Choose date…": "Chọn ngày…",
+  "Save": "Lưu",
+  "Older photos are not uploaded through GoToHP. Google Photos still marks the ones already in the cloud as backed up.": "Ảnh cũ hơn sẽ không được tải lên qua GoToHP. Google Photos vẫn đánh dấu những ảnh đã có trên đám mây là đã sao lưu."
 }

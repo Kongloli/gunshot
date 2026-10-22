@@ -153,6 +153,22 @@ static void GSStart(id request, SEL selector, IMP original) {
         ((void (*)(id, SEL))original)(request, selector);
         return;
     }
+    if (GSNativeRoutingSkipsAsset(asset)) {
+        // Older than the user's cutoff: never export or upload through GoToHP. Run the
+        // native request in reconcile mode instead: its server lookup marks items that
+        // already exist in the cloud as backed up, while GSGuard still blocks any native
+        // payload upload for items that do not.
+        GSBackupTransfer *skip = [GSBackupTransfer new];
+        skip.localID = asset.localIdentifier;
+        skip.reconciling = YES;
+        objc_setAssociatedObject(request, &GSTransferKey, skip, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        @synchronized(GSLock) {
+            [GSReconciling addObject:skip.localID];
+        }
+        GSCount(@"skippedBeforeCutoff");
+        ((void (*)(id, SEL))original)(request, selector);
+        return;
+    }
     GSBackupTransfer *transfer = [GSBackupTransfer new];
     transfer.localID = asset.localIdentifier;
     objc_setAssociatedObject(request, &GSTransferKey, transfer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);

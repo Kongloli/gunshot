@@ -12,6 +12,7 @@
 static BOOL GSInstalled;
 static NSString *const GSEnabledKey = @"dev.tqmane.gunshot.routeManualBackup";
 static NSString *const GSAccountKey = @"dev.tqmane.gunshot.routeAccount";
+static NSString *const GSCutoffKey = @"dev.tqmane.gunshot.routeSince";
 static void (*GSBackupOriginal)(id, SEL, id);
 static void (*GSGridBackupOriginal)(id, SEL, id);
 static dispatch_queue_t GSImportQueue;
@@ -64,6 +65,22 @@ void GSSetNativeRouting(BOOL enabled, NSString *account) {
     [NSUserDefaults.standardUserDefaults setBool:enabled && GSNativeRoutingAvailable()
                                           forKey:GSEnabledKey];
 }
+NSDate *GSNativeRoutingCutoff(void) {
+    id value = [NSUserDefaults.standardUserDefaults objectForKey:GSCutoffKey];
+    return [value isKindOfClass:NSDate.class] ? value : nil;
+}
+void GSSetNativeRoutingCutoff(NSDate *cutoff) {
+    if (cutoff)
+        [NSUserDefaults.standardUserDefaults setObject:cutoff forKey:GSCutoffKey];
+    else
+        [NSUserDefaults.standardUserDefaults removeObjectForKey:GSCutoffKey];
+}
+// Assets without a creation date are never skipped, so nothing is silently dropped.
+BOOL GSNativeRoutingSkipsAsset(PHAsset *asset) {
+    NSDate *cutoff = GSNativeRoutingCutoff();
+    NSDate *created = [asset isKindOfClass:PHAsset.class] ? asset.creationDate : nil;
+    return cutoff && created && [created compare:cutoff] == NSOrderedAscending;
+}
 // Called on the import worker, including after potentially slow iCloud export.
 static BOOL GSImportAuthorized(NSString *account, NSString *identity) {
     __block BOOL authorized = NO;
@@ -103,6 +120,20 @@ static void GSRoute(id localAssets) {
     if (!valid || !assets.count) {
         GSImportResult(@"The selected photos could not be retrieved.", 0);
         return;
+    }
+    // Items created before the configured cutoff are left alone (not uploaded).
+    NSIndexSet *skipped =
+        [assets indexesOfObjectsPassingTest:^BOOL(PHAsset *a, NSUInteger i, BOOL *stop) {
+            return GSNativeRoutingSkipsAsset(a);
+        }];
+    if (skipped.count) {
+        @synchronized(GSImportLock) {
+            GSImportStatus[@"skippedBeforeCutoff"] =
+                @([GSImportStatus[@"skippedBeforeCutoff"] unsignedIntegerValue] + skipped.count);
+        }
+        [assets removeObjectsAtIndexes:skipped];
+        if (!assets.count)
+            return;
     }
     NSString *account = [GSNativeRoutingAccount() copy];
     NSArray *selection = [assets copy];

@@ -350,7 +350,7 @@
     if (GSIsGooglePhotos())
         [groups addObject:@{
             @"title" : GSL(@"Google Photos integration"),
-            @"rows" : @[ @10 ],
+            @"rows" : @[ @10, @20 ],
             @"footer" : GS_BACKUP_HELP
         }];
     [groups addObject:@{@"title" : GSL(@"Queue management"), @"rows" : @[ @8, @9 ]}];
@@ -524,7 +524,8 @@
             GSL(@"Show unlimited storage"),
             GSL(@"Choose album"),
             GSL(@"Stop preparing"),
-            @"Google Photos · Liquid Glass"
+            @"Google Photos · Liquid Glass",
+            GSL(@"Only back up photos taken after")
         ];
         NSArray *icons = @[
             @"photo",
@@ -546,7 +547,8 @@
             @"cloud",
             @"rectangle.stack",
             @"stop.circle",
-            @"rectangle.bottomhalf.inset.filled"
+            @"rectangle.bottomhalf.inset.filled",
+            @"calendar.badge.clock"
         ];
         cell.textLabel.text = titles[control];
         cell.imageView.image = [UIImage systemImageNamed:icons[control]];
@@ -583,6 +585,14 @@
                 [NSString stringWithFormat:GSL(@"Retry limit: %@"), self.options[@"retries"] ?: @3];
         if (control == 6)
             cell.detailTextLabel.text = self.accounts[@"selected"];
+        if (control == 20) {
+            NSDate *cutoff = GSNativeRoutingCutoff();
+            cell.detailTextLabel.text =
+                cutoff ? [NSDateFormatter localizedStringFromDate:cutoff
+                                                        dateStyle:NSDateFormatterMediumStyle
+                                                        timeStyle:NSDateFormatterShortStyle]
+                       : GSL(@"All photos");
+        }
         if (control == 13)
             cell.detailTextLabel.text = GSL(@"Check the connection for the signed-in account");
         if (control == 7)
@@ -1004,6 +1014,10 @@
             [self toggleNativeRouting];
             return;
         }
+        if (control == 20) {
+            [self chooseRoutingCutoff];
+            return;
+        }
         if (control == 11) {
             GSSetUploadDiagnostics(!GSUploadDiagnosticsEnabled());
             [self reloadTablePreservingPosition];
@@ -1045,6 +1059,82 @@
                                             handler:nil]];
         [self sheet:a];
     }
+}
+- (void)chooseRoutingCutoff {
+    UIAlertController *sheet = [UIAlertController
+        alertControllerWithTitle:GSL(@"Only back up photos taken after")
+                         message:GSL(@"Older photos are not uploaded through GoToHP. Google "
+                                     @"Photos still marks the ones already in the cloud as "
+                                     @"backed up.")
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+    [sheet addAction:[UIAlertAction actionWithTitle:GSL(@"From now on")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *action) {
+                                                GSSetNativeRoutingCutoff(NSDate.date);
+                                                [self reloadTablePreservingPosition];
+                                            }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:GSL(@"Choose date…")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction *action) {
+                                                [self presentRoutingCutoffPicker];
+                                            }]];
+    if (GSNativeRoutingCutoff())
+        [sheet addAction:[UIAlertAction actionWithTitle:GSL(@"All photos")
+                                                  style:UIAlertActionStyleDestructive
+                                                handler:^(UIAlertAction *action) {
+                                                    GSSetNativeRoutingCutoff(nil);
+                                                    [self reloadTablePreservingPosition];
+                                                }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:GSL(@"Cancel")
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    [self sheet:sheet];
+}
+- (void)presentRoutingCutoffPicker {
+    UIViewController *controller = [UIViewController new];
+    controller.title = GSL(@"Only back up photos taken after");
+    controller.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
+    UIDatePicker *picker = [UIDatePicker new];
+    picker.datePickerMode = UIDatePickerModeDateAndTime;
+    picker.preferredDatePickerStyle = UIDatePickerStyleInline;
+    picker.maximumDate = NSDate.date;
+    picker.date = GSNativeRoutingCutoff() ?: NSDate.date;
+    picker.translatesAutoresizingMaskIntoConstraints = NO;
+    [controller.view addSubview:picker];
+    UILayoutGuide *guide = controller.view.safeAreaLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [picker.topAnchor constraintEqualToAnchor:guide.topAnchor constant:8],
+        [picker.leadingAnchor constraintEqualToAnchor:guide.leadingAnchor constant:16],
+        [picker.trailingAnchor constraintEqualToAnchor:guide.trailingAnchor constant:-16]
+    ]];
+    UINavigationController *navigation =
+        [[UINavigationController alloc] initWithRootViewController:controller];
+    __weak UINavigationController *weakNavigation = navigation;
+    __weak UIDatePicker *weakPicker = picker;
+    controller.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc]
+        initWithPrimaryAction:[UIAction actionWithTitle:GSL(@"Cancel")
+                                                  image:nil
+                                             identifier:nil
+                                                handler:^(UIAction *action) {
+                                                    [weakNavigation
+                                                        dismissViewControllerAnimated:YES
+                                                                           completion:nil];
+                                                }]];
+    controller.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+        initWithPrimaryAction:
+            [UIAction actionWithTitle:GSL(@"Save")
+                                image:nil
+                           identifier:nil
+                              handler:^(UIAction *action) {
+                                  if (weakPicker)
+                                      GSSetNativeRoutingCutoff(weakPicker.date);
+                                  [weakNavigation
+                                      dismissViewControllerAnimated:YES
+                                                         completion:^{
+                                                             [self reloadTablePreservingPosition];
+                                                         }];
+                              }]];
+    [self presentViewController:navigation animated:YES completion:nil];
 }
 - (void)choose {
     if (![self.accounts[@"selected"] length]) {
