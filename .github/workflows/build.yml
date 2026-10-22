@@ -1,135 +1,28 @@
-name: Build and test
+name: Build jailed dylib
 on:
   push:
     branches: [main]
-    tags: ['v*']
-  pull_request:
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: 'Existing v* tag to rebuild and publish (leave empty for build only)'
-        required: false
-        type: string
-        default: ''
 permissions:
   contents: read
 jobs:
-  core:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
-          submodules: recursive
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26.0'
-      - run: python3 -m pip install clang-format==18.1.8 black==25.1.0
-      - run: python3 scripts/format.py --check
-      - run: bash scripts/test-core.sh
-  package:
-    runs-on: macos-15
-    strategy:
-      fail-fast: false
-      matrix:
-        scheme: [rootless, rootful]
-    env:
-      THEOS: ${{ github.workspace }}/.theos-sdk
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
-          submodules: recursive
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26.0'
-      - name: Install Theos and tools
-        run: bash scripts/setup-theos.sh
-      - name: Native jailbreak fixtures
-        if: matrix.scheme == 'rootless'
-        run: bash scripts/test-native.sh jailbreak
-      - name: Build Go archive and Debian package
-        run: bash scripts/package.sh '${{ matrix.scheme }}'
-      - name: Verify package layout
-        run: python3 scripts/verify-package.py '${{ matrix.scheme }}'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: gotohp-tweak-${{ matrix.scheme }}
-          path: |
-            packages/*.deb
-            packages/jailed/*.deb
-            packages/jailed/*.dylib
-            packages/jailed/ThirdPartyNotices.txt
-          if-no-files-found: error
-  jailed-test:
-    name: jailed tests
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
-          submodules: recursive
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26.0'
-      - name: Native jailed fixtures
-        run: bash scripts/test-native.sh jailed
   jailed-build:
-    name: package (jailed)
-    runs-on: macos-15
+    runs-on: macos-15-intel
     env:
       THEOS: ${{ github.workspace }}/.theos-sdk
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.release_tag && format('refs/tags/{0}', inputs.release_tag) || github.ref }}
           submodules: recursive
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.0'
       - name: Install Theos and tools
         run: bash scripts/setup-theos.sh
-      - name: Build Go archive and Debian package
+      - name: Build jailed dylib
         run: bash scripts/package.sh jailed
-      - name: Verify package layout
-        run: python3 scripts/verify-package.py jailed
       - uses: actions/upload-artifact@v4
         with:
-          name: gotohp-tweak-jailed
-          path: |
-            packages/jailed/*.deb
-            packages/jailed/*.dylib
-            packages/jailed/ThirdPartyNotices.txt
+          name: GunshotJailed
+          path: packages/jailed/GunshotJailed.dylib
           if-no-files-found: error
-  release:
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.release_tag, 'v'))
-    needs: [core, package, jailed-build]
-    runs-on: ubuntu-latest
-    concurrency:
-      group: release-${{ inputs.release_tag || github.ref_name }}
-      cancel-in-progress: false
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - name: Name packages
-        run: |
-          cp artifacts/gotohp-tweak-rootless/*.deb gotohp-tweak-rootless.deb
-          cp artifacts/gotohp-tweak-rootful/*.deb gotohp-tweak-rootful.deb
-          cp artifacts/gotohp-tweak-jailed/*.deb gotohp-tweak-jailed.deb
-          cp artifacts/gotohp-tweak-jailed/GunshotJailed.dylib GunshotJailed.dylib
-          cp artifacts/gotohp-tweak-jailed/ThirdPartyNotices.txt ThirdPartyNotices.txt
-      - name: Publish release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
-        run: |
-          assets=(gotohp-tweak-rootless.deb gotohp-tweak-rootful.deb gotohp-tweak-jailed.deb GunshotJailed.dylib ThirdPartyNotices.txt)
-          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null; then
-            gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
-          else
-            gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --verify-tag --generate-notes
-          fi
