@@ -16,6 +16,8 @@
 @property (atomic) BOOL cancelled;
 @property (atomic) BOOL cancelGo;
 @property (atomic) BOOL reconciling;
+// Set when reconciling follows a completed GoToHP upload (not a cutoff skip).
+@property (atomic) BOOL goCompleted;
 @property (atomic) BOOL finished;
 @property (atomic) double progress;
 @property (atomic, copy) NSString *jobID;
@@ -36,6 +38,28 @@ static void GSCount(NSString *key) {
     @synchronized(GSLock) {
         GSCounts[key] = @([GSCounts[key] unsignedIntegerValue] + 1);
     }
+}
+// Assets whose GoToHP upload completed but which native lookup could not match
+// (for example edited photos: GoToHP uploads the unedited original). Retrying them
+// only re-exports the same original, so later requests go straight to reconcile.
+static NSString *const GSUploadedKey = @"dev.tqmane.gunshot.uploadedUnmatched";
+static const NSUInteger GSUploadedLimit = 5000;
+static BOOL GSUploadedUnmatched(NSString *localID) {
+    NSArray *ids = [NSUserDefaults.standardUserDefaults stringArrayForKey:GSUploadedKey];
+    return localID.length && [ids containsObject:localID];
+}
+static void GSRememberUploadedUnmatched(NSString *localID) {
+    if (!localID.length)
+        return;
+    NSMutableArray *ids =
+        [[NSUserDefaults.standardUserDefaults stringArrayForKey:GSUploadedKey] mutableCopy]
+            ?: [NSMutableArray array];
+    if ([ids containsObject:localID])
+        return;
+    [ids addObject:localID];
+    if (ids.count > GSUploadedLimit)
+        [ids removeObjectsInRange:NSMakeRange(0, ids.count - GSUploadedLimit)];
+    [NSUserDefaults.standardUserDefaults setObject:ids forKey:GSUploadedKey];
 }
 BOOL GSBackupRequestsAvailable(void) {
     return GSInstalled;
@@ -153,8 +177,10 @@ static void GSStart(id request, SEL selector, IMP original) {
         ((void (*)(id, SEL))original)(request, selector);
         return;
     }
-    if (GSNativeRoutingSkipsAsset(asset)) {
-        // Older than the user's cutoff: never export or upload through GoToHP. Run the
+    BOOL beforeCutoff = GSNativeRoutingSkipsAsset(asset);
+    if (beforeCutoff || GSUploadedUnmatched(asset.localIdentifier)) {
+        // Older than the user's cutoff, or already uploaded by GoToHP but unmatched by
+        // native lookup: never export or upload through GoToHP again. Run the
         // native request in reconcile mode instead: its server lookup marks items that
         // already exist in the cloud as backed up, while GSGuard still blocks any native
         // payload upload for items that do not.
@@ -165,7 +191,7 @@ static void GSStart(id request, SEL selector, IMP original) {
         @synchronized(GSLock) {
             [GSReconciling addObject:skip.localID];
         }
-        GSCount(@"skippedBeforeCutoff");
+        GSCount(beforeCutoff ? @"skippedBeforeCutoff" : @"skippedAlreadyUploaded");
         ((void (*)(id, SEL))original)(request, selector);
         return;
     }
@@ -276,6 +302,7 @@ static void GSStart(id request, SEL selector, IMP original) {
                     if (transfer.cancelled || transfer.finished)
                         return;
                     transfer.reconciling = YES;
+                    transfer.goCompleted = YES;
                     [GSReconciling addObject:transfer.localID];
                 }
                 GSCount(@"reconciling");
@@ -301,6 +328,8 @@ static void GSFinish(id request, BOOL success) {
             [GSReconciling removeObject:t.localID];
         if (t.reconciling)
             GSCount(success ? @"nativeReconciled" : @"reconcileFailed");
+        if (t.reconciling && t.goCompleted && !success && !t.cancelled)
+            GSRememberUploadedUnmatched(t.localID);
     }
 }
 static void GSBindCompletion(Class c, BOOL live) {
